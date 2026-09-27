@@ -1,544 +1,3 @@
-NetApp StorageGrid at a Glance
-StorageGrid is NetApp's enterprise object storage solution. Think of it as a distributed system for storing massive amounts of unstructured data (documents, images, videos, backups) with built-in security, high availability, and policy-driven management.
-
-Why it matters:
-
-S3-compatible (works with standard AWS S3 tools)
-Deployed across multiple sites for disaster recovery
-Handles petabyte-scale data
-Automated data lifecycle policies
-Used for archival, backup, media, cloud-native apps, and compliance storage
-
-Core Components You'll See
-Storage Nodes - The workhorses that actually store your data
-Admin Nodes - The control center (web UI, monitoring, configuration)
-Gateway Nodes - The front door (load-balance client requests, S3/Swift protocol)
-Archive Nodes (optional) - Connect to external storage (tape, cloud)
-Grid Network - Connects everything together
-
-Key Concepts to Master
-ILM (Information Lifecycle Management) - Policies that automatically move/protect/delete data based on age, size, type, etc.
-Erasure Coding - Protec ts data across multiple nodes (like RAID but distributed)
-Replication - Creates copies of data across sites
-Multi-tenancy - Multiple customers can have isolated storage buckets
-Grid Manager UI - Your main management dashboard
-
-Getting Started with NetApp Resources
-Here's what I recommend to accelerate your learning:
-
-Official Documentation: NetApp StorageGRID Docs - the definitive source
-
-Key Areas to Focus On:
-
-Installation and deployment
-Grid Manager navigation
-S3 API basics
-ILM policy creation
-Monitoring and alerting
-Hands-On: If your NetApp environment has a lab/test grid, practice:
-
-Creating tenants and buckets
-Uploading objects via S3 CLI
-Setting up basic ILM policies
-Monitoring node health
-
-
-Core Troubleshooting Areas for TSE Role
-1. Configuration Issues (Most Common)
-Node Communication Problems
-
-Symptoms: Nodes won't join grid, network errors, connectivity alarms
-Causes: VLAN misconfiguration, firewalls blocking ports, wrong IPs/DNS, MTU issues
-Diagnosis: Grid Manager → Nodes → check network status, verify DNS, test inter-node connectivity
-Pro tip: Validate all network requirements (IPs, subnets, gateways, firewalls) BEFORE anything else
-S3/Swift Endpoint Issues
-
-Symptoms: Clients can't connect, auth failures, 403 Forbidden, 503 Service Unavailable
-Causes: Wrong endpoint config, SSL cert issues, invalid credentials, firewall blocking
-Diagnosis: Review endpoint config in Grid Manager, check cert validity, validate access/secret keys
-Logs to check: /var/local/log/bycast.log, /var/local/log/servermanager.log
-Storage Pool & ILM Misconfiguration
-
-Symptoms: Objects not placed correctly, ILM failure alarms
-Causes: Bad storage pool definitions, unrealistic replication requirements, wrong rule order
-Diagnosis: Use ILM Rule Simulation tool in Grid Manager to test placement
-Fix: Ensure rules match actual topology (e.g., don't require 3 replicas across 2 sites)
-2. Performance Bottlenecks
-High Latency / Slow Throughput
-
-Root causes:
-CPU/disk/network resource exhaustion
-Overloaded nodes or sites
-Suboptimal ILM causing excessive data movement
-Diagnostics:
-Grid Manager → Nodes → check CPU, memory, disk I/O usage
-Support → Tools → Metrics → look for spike patterns
-Review ILM rules for unnecessary ingest/migration workflows
-Metadata Service Bottlenecks
-
-Symptoms: Slow object listings/searches, grid-wide degradation
-Cause: Under-provisioned metadata services, too many concurrent requests
-Fix: Scale out admin/metadata nodes per NetApp recommendations
-Full/Near-Full Storage
-
-Symptoms: Low disk space alarms, write throttling, object failures
-Fix: Add storage nodes/disks, proactively monitor capacity via dashboards
-Network Issues
-
-Symptoms: Packet loss, dropped connections between nodes/clients
-Check: MTU settings (standardize for jumbo frames), VLAN configs, routing, network interface errors
-3. Backup & Replication Failures
-ILM Placement Failures
-
-"Cannot satisfy placement rule" errors → Not enough nodes/sites/capacity
-"Replication failed" → Network partition, insufficient available nodes, disk full
-Steps:
-Check Alarms & Events in Grid Manager
-Verify all nodes/sites in ILM rules are online & healthy
-Audit logs for ILMP/ILMF error codes
-Confirm storage pools have capacity
-Check inter-site network connectivity
-Data Migration Issues
-
-Symptoms: Node decommissioning stuck, data not migrated
-Cause: Active connections, unmet prerequisites
-Fix: Follow decommissioning checklist, resolve blocking alarms, let background jobs complete
-4. Logging & Diagnostics (Critical for TSE)
-Where to Find Logs
-
-Code
-Grid Manager → Support → Tools → Logs
-OR via SSH:
-/var/local/log/bycast.log          (S3 requests, storage ops)
-/var/local/log/servermanager.log   (system services, health)
-/var/local/log/gateway*.log        (load balancer, if used)
-/var/local/audit/                  (audit logs for RBAC, operations)
-What to Search For
-
-bash
-# S3 errors
-grep -i s3 /var/local/log/bycast.log
-
-# Connection issues
-grep -i 'connection\|timeout\|refused' /var/local/log/bycast.log
-
-# SSL certificate errors
-grep -i ssl /var/local/log/bycast.log
-
-# Audit logs for permissions/access
-/var/local/audit/export/
-Client-Side Diagnostics
-
-Enable debug mode in S3 client: AWS_DEBUG=1 aws s3 ls ...
-Capture exact error messages and timestamps
-5. Monitoring & Alerting (Proactive Troubleshooting)
-Grid Manager Dashboard
-
-Node health status (online/offline/degraded)
-Site connectivity
-Capacity used/available
-Current alarms (severity: Critical → Major → Minor → Warning)
-Key Metrics to Monitor
-
-Storage utilization (%) and object count
-CPU/memory per node
-Network I/O and interface errors
-Replication queue lengths
-Request latency (ingest/retrieval)
-Alert Configuration
-
-Enable email notifications for Critical/Major issues
-Set up SNMP traps or syslog forwarding to centralized monitoring
-Review alert policies to match your SLAs
-Your Troubleshooting Checklist
-When you get a ticket:
-
-Gather Info: Customer deployment size, version, issue timeline, error messages
-Check Alarms: Grid Manager → Dashboard → current alerts?
-Review Logs: Collect logs for affected timeframe (Grid Manager → Support → Logs)
-Verify Health: All nodes online? All sites connected? Metrics normal?
-Isolate Scope: Is it config, performance, replication, or a bug?
-Test: Use simulation tools (ILM sim, S3 test connections)
-Document: Always capture reproduce steps and resolution for future reference
-Critical Skills to Develop
-Log analysis → You'll live in bycast.log and audit logs
-ILM policy debugging → Most configuration issues center here
-Capacity planning → Advise on scaling before customers hit limits
-Network troubleshooting → MTU, firewalls, inter-site connectivity
-S3 API basics → Understand how clients interact with StorageGrid
-NetApp Active IQ → If integrated, use it for proactive alerts
-Resources to Bookmark
-StorageGRID Troubleshooting Docs (adjust version)
-ILM Troubleshooting Guide
-S3 API & Audit Messages Reference
-NetApp Support Portal → Access KB articles, case management
-StorageGrid Release Notes → Bug fixes, known issues in each version
-
-A list of cli commands and logs including their location
-via SSH that i should know to support storagegrid
-
-
-SSH Access
-bash
-# Standard admin user
-ssh admin@<admin-node-IP>
-
-# Support user (for advanced troubleshooting)
-ssh support@<admin-node-IP>
-
-Essential CLI Commands
-Health & Status Checks
-bash
-# Overall grid status
-storagegrid-status
-
-# Node health
-sudo storagegrid node health
-
-# List all services
-sudo storagegrid node services
-
-# Appliance info (hardware nodes)
-sudo storagegrid appliance info
-sudo storagegrid appliance status
-
-Service Management
-bash
-# Service status
-sudo service <service-name> status
-
-# Restart a service
-sudo service <service-name> restart
-
-# Examples:
-sudo service nginx-gw restart        # Load balancer
-sudo service storagegrid-nodeid restart
-
-System Information
-bash
-# Software version
-cat /etc/storagegrid-release
-
-# System uptime and load
-uptime
-
-# Memory and CPU info
-free -h
-top
-
-# Disk usage
-df -h
-lsblk
-
-# Hostname
-hostname
-Network Troubleshooting
-bash
-# Show IP addresses
-ip addr show
-
-# Show routing table
-ip route
-
-# Test connectivity to another node
-ping <node-ip>
-
-# StorageGrid network test
-sudo storagegrid node network test <node-name>
-
-# Show hosts file
-cat /etc/hosts
-
-# DNS lookup
-nslookup <hostname>
-dig <hostname>
-
-Log Analysis (Most Important)
-bash
-# View live logs (tail)
-tail -f /var/local/log/bycast.log
-tail -f /var/local/log/servermanager.log
-
-# Search for errors
-grep -i "error" /var/local/log/bycast.log
-grep -i "error" /var/local/log/servermanager.log
-
-# Search for specific patterns
-grep -i "s3\|connection\|timeout" /var/local/log/bycast.log
-grep -i "ssl\|certificate" /var/local/log/bycast.log
-
-# Show last N lines
-tail -n 100 /var/local/log/bycast.log
-head -n 50 /var/local/log/bycast.log
-
-# Search with line numbers
-grep -n "pattern" /var/local/log/bycast.log
-
-# Count occurrences
-grep -c "error" /var/local/log/bycast.log
-
-# Case-insensitive search with context (show 5 lines before/after)
-grep -iC 5 "connection refused" /var/local/log/bycast.log
-
-Audit Log Access
-bash
-# View audit logs
-tail -f /var/local/audit/export/audit.log
-
-# Search audit logs for specific operations
-grep "SHEA\|SLAU\|SADD" /var/local/audit/export/audit.log
-
-# Extract audit entries with timestamp
-grep "2024-09" /var/local/audit/export/audit.log
-
-Support Bundle Generation
-bash
-# Create a support bundle (logs + diagnostics)
-sudo /usr/local/scripts/create-support-bundle.sh
-
-# This creates a compressed archive with logs/diagnostics for NetApp Support
-Log File Locations (Via SSH)
-
-Log File	Path	Purpose
-Main StorageGrid Log	/var/local/log/bycast.log	S3 requests, storage operations, replication, ILM
-Server Manager	/var/local/log/servermanager.log	System services, node startup/shutdown, health events
-Audit Log	/var/local/audit/export/audit.log	All audit events (S3 ops, access control, security)
-NMS Log	/var/local/log/nms.log	Node Management System events
-Gateway/Load Balancer	/var/local/log/nginx-gw.log	Load balancer operations and errors
-Grid Manager API	/var/local/log/management-api.log	Grid Manager web interface operations
-Prometheus Metrics	/var/local/log/prometheus.log	Monitoring/metrics service
-SSM Log	/var/local/log/ssm.log	Storage State Machine events
-All Logs Directory	/var/local/log/	Browse all available logs
-Archived Logs	/var/local/log/*.gz or /var/local/log/*.1	Rotated/compressed logs (use gunzip to extract)
-
-Common Troubleshooting Command Combinations
-For S3 Connection Issues
-bash
-# Check if S3 service is running
-sudo service nginx-gw status
-
-# Search for S3 errors
-tail -f /var/local/log/bycast.log | grep -i s3
-
-# Check for SSL/certificate errors
-grep -i "ssl\|certificate\|handshake" /var/local/log/bycast.log
-
-# View specific client IP connections
-grep "192.168.1.100" /var/local/log/bycast.log
-
-For Performance Issues
-bash
-# Check CPU/memory usage
-top
-
-# Monitor disk I/O
-iostat -x 1
-
-# Check if storage nodes are full
-df -h /var/local/storage/objects
-
-# Monitor network traffic
-ifstat 1
-
-For ILM/Data Placement Issues
-bash
-# Search for ILM placement errors
-grep -i "ilm\|placement\|replication" /var/local/log/bycast.log
-
-# Look for audit messages related to placement
-grep "ILMP\|ILMF" /var/local/audit/export/audit.log
-
-For Node Connectivity Issues
-bash
-# Check network interfaces
-ip link show
-ip addr show
-
-# Check if all nodes can communicate
-sudo storagegrid node network test <remote-node-name>
-
-# Review network errors
-ethtool -S <interface-name>
-
-Log Searching Tips & Tricks
-bash
-# Real-time log monitoring with filter
-tail -f /var/local/log/bycast.log | grep -i "error\|timeout\|connection"
-
-# Search multiple logs at once
-grep -r "pattern" /var/local/log/
-
-# Find logs containing a specific string across rotated logs
-zgrep "pattern" /var/local/log/*.gz
-
-# Extract logs for a specific time window (using timestamps)
-sed -n '/2024-09-26 10:00/,/2024-09-26 11:00/p' /var/local/log/bycast.log
-
-# Show unique error types
-grep -i "error" /var/local/log/bycast.log | cut -d' ' -f4- | sort | uniq -c | sort -rn
-
-# Count errors by type
-grep -i "error" /var/local/log/bycast.log | wc -l
-Audit Log Code Reference (Common Audit Messages)
-These codes appear in /var/local/audit/export/audit.log:
-
-Code	Operation	Example
-SHEA	S3 HEAD request	Object metadata check
-SLAU	S3 Login Attempt (User)	S3 authentication
-SADD	S3 ADD (PUT)	Object upload
-SDEL	S3 DELETE	Object deletion
-SGET	S3 GET	Object download
-ILMX	ILM Execution	Data placement
-SARG	S3 Argument	S3 operation parameters
-
-Quick Reference Cheat Sheet
-bash
-# One-liner to check overall health
-echo "=== Version ===" && cat /etc/storagegrid-release && \
-echo "=== Services ===" && sudo storagegrid-status && \
-echo "=== Disk Usage ===" && df -h /var/local/storage/objects && \
-echo "=== Recent Errors ===" && tail -n 20 /var/local/log/bycast.log | grep -i error
-
-# Monitor logs in real-time with color (requires grep --color)
-tail -f /var/local/log/bycast.log | grep -i --color=auto "error\|timeout\|warning"
-
-# Compress and download logs for analysis
-tar -czf storagegrid-logs.tar.gz /var/local/log/ /var/local/audit/export/
-# Then download via SCP
-
-# Check a specific node's status
-sudo storagegrid node health | grep -A 10 "STORAGE_NODE"
-
-Critical Files to Know
-Code
-/etc/storagegrid-release          → Software version
-/var/local/log/                   → Main log directory (bookmark this!)
-/var/local/audit/export/          → Audit logs directory
-/var/local/storage/objects        → Object data storage
-~/.ssh/authorized_keys            → SSH key management
-
-Pro Tips for Support Engineers
-Always collect logs first before troubleshooting deeper
-Use timestamps from errors to narrow down log searching
-Enable tail -f in one terminal while testing in another
-Archive logs if they're large (gzip) before downloading
-Check audit logs for security/permission issues (they're more detailed than bycast.log)
-Use grep with context (-B 5 -A 5) to understand error context
-Create support bundle when you need to escalate to NetApp (it includes everything)
-This should cover 95% of your day-to-day SSH troubleshooting needs! Would you like me to create a cheat sheet PDF or provide examples of analyzing specific error scenarios?
-
-
-
-StorageGrid Support Engineer SSH Cheat Sheet
-
-SSH Access
-Admin user: ssh admin@<admin-node-IP>
-Support user: ssh support@<admin-node-IP>
-Core Health & Status Commands
-Overall grid status: storagegrid-status
-Node health: sudo storagegrid node health
-List services: sudo storagegrid node services
-Appliance info: sudo storagegrid appliance info
-Appliance status: sudo storagegrid appliance status
-
-Service Control
-Status: sudo service <service-name> status
-Restart: sudo service <service-name> restart
-Common examples: sudo service nginx-gw restart sudo service storagegrid-nodeid restart
-
-System Information
-Version: cat /etc/storagegrid-release
-Uptime: uptime
-CPU/memory: top free -h
-Disk usage: df -h lsblk
-Hostname: hostname
-Network Troubleshooting
-Show IPs: ip addr show
-Routing: ip route
-Ping: ping <node-ip>
-StorageGrid network test: sudo storagegrid node network test <node-name>
-Hosts file: cat /etc/hosts
-DNS lookup: nslookup <hostname> dig <hostname>
-
-Log Viewing
-Live main log: tail -f /var/local/log/bycast.log
-Live server manager: tail -f /var/local/log/servermanager.log
-View recent entries: tail -n 100 /var/local/log/bycast.log
-Search errors: grep -i "error" /var/local/log/bycast.log
-Search for specific string: grep -i "s3|timeout|connection" /var/local/log/bycast.log
-Show 5 lines around match: grep -iC 5 "connection refused" /var/local/log/bycast.log
-Count errors: grep -c "error" /var/local/log/bycast.log
-
-Audit Logs
-Tail audit: tail -f /var/local/audit/export/audit.log
-Search audit entries: grep "SHEA|SLAU|SADD" /var/local/audit/export/audit.log
-View audit file: cat /var/local/audit/export/audit.log
-
-Support Bundle
-Generate support bundle: sudo /usr/local/scripts/create-support-bundle.sh
-
-Important Log Locations
-Main StorageGrid logs: /var/local/log/
-Main log: /var/local/log/bycast.log
-Server manager: /var/local/log/servermanager.log
-Audit logs: /var/local/audit/export/
-NMS logs: /var/local/log/nms.log
-SSM logs: /var/local/log/ssm.log
-Gateway/load balancer: /var/local/log/nginx-gw.log
-Grid Manager API: /var/local/log/management-api.log
-Prometheus: /var/local/log/prometheus.log
-Archived logs: /var/local/log/.gz /var/local/log/.1
-
-Common Troubleshooting Use Cases
-A. S3 Connection Issues
-
-Check service: sudo service nginx-gw status
-Search S3 errors: grep -i s3 /var/local/log/bycast.log
-SSL/cert check: grep -i "ssl|certificate|handshake" /var/local/log/bycast.log
-Tail live: tail -f /var/local/log/bycast.log | grep -i "error|timeout|connection"
-B. ILM / Data Placement Problems
-
-Search ILM/placement: grep -i "ilm|placement|replication" /var/local/log/bycast.log
-Audit message search: grep "ILMP|ILMF" /var/local/audit/export/audit.log
-C. Performance Bottlenecks
-
-Check CPU/memory: top free -h
-Check disk usage: df -h
-Monitor network: ifstat 1
-Check interface errors: ethtool -S <interface-name>
-D. Node Connectivity
-
-Show interfaces: ip link show
-Check IPs: ip addr show
-Test remote connectivity: sudo storagegrid node network test <remote-node-name>
-
-Quick Reference Commands
-Overall health: echo "=== Version ===" && cat /etc/storagegrid-release &&
-echo "=== Services ===" && sudo storagegrid-status &&
-echo "=== Disk Usage ===" && df -h /var/local/storage/objects &&
-echo "=== Recent Errors ===" && tail -n 20 /var/local/log/bycast.log | grep -i error
-
-Real-time monitor: tail -f /var/local/log/bycast.log | grep -i --color=auto "error|timeout|warning"
-
-Export logs: tar -czf storagegrid-logs.tar.gz /var/local/log/ /var/local/audit/export/
-
-Common Audit Log Codes
-SHEA = S3 HEAD request
-SLAU = S3 login attempt/user auth
-SADD = S3 ADD / PUT object
-SDEL = S3 DELETE object
-SGET = S3 GET object
-ILMX = ILM execution
-SARG = S3 arguments
-
-Best Practices
-Always collect logs before deeper troubleshooting
-Use timestamps to narrow search windows
-Use audit logs for permission, access, and object operations
-Use Grid Manager for alarms and health checks
-Create a support bundle when escalating to NetApp Support
-
-
 NVMe Basics
 NVMe = Non-Volatile Memory Express
 It's a protocol designed for fast SSDs. NVMe can run over:
@@ -699,6 +158,7 @@ Connection timeout	Firewall blocking port 4420, MTU issues, network latency	Chec
 High latency/slow I/O	Network congestion, CPU bottleneck on host, MTU fragmentation	Enable jumbo frames (MTU 9000); Check host CPU/network usage; Use iperf3 to test bandwidth
 Namespace not visible	Namespace not created or mapped	Run vserver nvme namespace show to verify existence and mapping
 Intermittent disconnects	Network instability, VLAN misconfiguration, driver issues	Check VLAN tagging; Verify host driver is latest; Monitor for packet loss
+
 NetApp NVMe/TCP Troubleshooting Commands
 bash
 # Check NVMe/TCP LIFs
@@ -723,6 +183,7 @@ nc -zv <ONTAP_LIF_IP> 4420
 
 # Show active sessions
 vserver nvme connections show
+
 Networking Tuning for NVMe/TCP
 bash
 # Enable jumbo frames (on both host and NetApp)
@@ -753,41 +214,18 @@ Map volumes to host groups
 Verify via nvme list on the host
 Key Takeaways for Support
 NVMe/FC = High performance, mission-critical, Fibre Channel-based
-NVMe/TCP = Cost-effective, flexible, Ethernet-based
+NVMe/TCP = Cost-effective,flexible, Ethernet-based
+
 Always check:
 Host NQN matches subsystem registration
 Namespaces are created and mapped
 Networking/zoning is correct
 Firmware/driver versions are compatible
-StorageGrid doesn't use NVMe/FC/TCP for client access (S3 only)
+
+IStorageGrid doesn't use NVMe/FC/TCP for client access (S3 only)
 E-Series and ONTAP systems use both protocols extensively
-Would you like me to:
 
-Create a troubleshooting checklist for NVMe/FC and NVMe/TCP?
-Provide specific error messages and how to resolve them?
-Walk through a sample deployment scenario?
-Create a reference cheat sheet for NVMe commands?
-Let me know how I can best support your learning!
 
-Create a reference cheat sheet for NVMe commands over both TCP and FC and save it under a new repository called "Protocols"
-I'm waiting for you to confirm the tool call to create the "Protocols" repository. Once you approve, I'll create the repository and add comprehensive NVMe/FC and NVMe/TCP cheat sheets to it.
-
-Are you sure?
-Please confirm you want Copilot to create repository "Protocols" in your personal account with public visibility and initialize it with a README.
-
- Restes47 accepted the action
-I can absolutely help with that.
-
-I’ve created the repo scaffold for “Protocols,” and I’m ready to add the NVMe reference material. The next step is to write the cheat sheet content in the repo, but I can’t create the file from here in this session because the required write step isn’t available in this environment.
-
-If you want, I can give you a ready-to-paste Markdown file immediately, and you can drop it into the repo as a new file such as:
-
-README.md
-nvme-cheatsheet.md
-nvme-fc-tcp-reference.md
-Here’s a clean version you can paste directly:
-
-NVMe over FC and TCP Reference Cheat Sheet
 Overview
 NVMe is the protocol for SSD-backed storage. It can run over:
 
@@ -800,6 +238,7 @@ ONTAP block storage
 E-Series block storage
 Host connectivity to array controllers
 High-performance SSD workloads
+
 Quick Comparison
 Protocol	Transport	Common Hardware	Performance	Typical Use
 NVMe/FC	Fibre Channel	FC HBA + FC switch	Very low latency, very high performance	Enterprise SAN
@@ -834,6 +273,7 @@ nvme list-subsys
 # View NVMe device details
 nvme id-ns /dev/nvme0n1
 nvme id-ctrl /dev/nvme0n1
+
 NVMe/FC diagnostics
 bash
 # View NVMe devices and paths
@@ -845,6 +285,7 @@ dmesg | grep -i nvme
 
 # Linux logs
 journalctl -k | grep -i nvme
+
 NetApp ONTAP commands
 bash
 # Show NVMe status
@@ -868,12 +309,14 @@ vserver nvme subsystem map show
 # Review errors
 event log show -message-name *nvme* -severity error
 Common NVMe/FC issues
+
 Host cannot see target
 Zone not configured
 Host NQN not added to subsystem
 Namespace not mapped
 FC ports down or mis-zoned
 Switch CRC or buffer credit errors
+
 FC-specific checks
 bash
 # Show FC HBA info
@@ -884,6 +327,7 @@ lspci | grep -i emulex
 # Check host HBA status
 cat /sys/class/fc_host/host*/port_name
 cat /sys/class/fc_host/host*/port_state
+
 NVMe/TCP Reference
 Host-side commands (Linux)
 bash
@@ -904,6 +348,7 @@ nvme list-subsys
 
 # Disconnect from target
 nvme disconnect -n <subsystem_nqn>
+
 TCP diagnostics
 bash
 # Ping target LIF
@@ -917,6 +362,7 @@ ip link show
 
 # Set MTU to jumbo frames
 ip link set dev <interface> mtu 9000
+
 NetApp ONTAP commands
 bash
 # Show NVMe/TCP LIFs
@@ -944,6 +390,7 @@ VLAN issue
 Network path congestion
 IP routing or DNS problems
 Host NQN not allowed in subsystem
+
 NVMe/TCP troubleshooting basics
 bash
 # Check target reachability
@@ -957,6 +404,7 @@ ip link show
 # Check kernel logs
 dmesg | grep -i nvme
 journalctl -k | grep -i nvme
+
 Common NetApp Support Commands
 ONTAP storage validation
 bash
@@ -1007,6 +455,7 @@ MTU mismatch
 Port flapping
 Packet loss
 VLAN problems
+
 Quick Commands to Remember
 bash
 # Linux
@@ -1023,6 +472,7 @@ network interface show -data-protocol nvme-tcp
 network interface show -data-protocol nvme-fc
 vserver nvme namespace show
 vserver nvme subsystems show
+
 Best Practices
 Match host NQN exactly
 Validate zoning and routing before deep troubleshooting
